@@ -11,12 +11,14 @@ class UserCreation extends Notification
 {
     use Queueable;
 
+    protected $newUser;
+
     /**
      * Create a new notification instance.
      */
-    public function __construct()
+    public function __construct($newUser)
     {
-        //
+        $this->newUser = $newUser;
     }
 
     /**
@@ -34,9 +36,34 @@ class UserCreation extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $subject = 'New User Created';
+        $greeting = 'Hello,';
+        $lines = [];
+
+        if ($notifiable->id === $this->newUser->id) {
+            // Email to the newly created user
+            $subject = 'Welcome to Our Application';
+            $greeting = "Welcome {$this->newUser->name},";
+            $lines = [
+                "Your account has been successfully created.",
+                "Email: {$this->newUser->email}",
+                "Role: {$this->newUser->role}",
+                'You can now log in with your credentials.'
+            ];
+        } else {
+            // Email to administrators
+            $lines = [
+                "A new user has been created.",
+                "Name: {$this->newUser->name}",
+                "Email: {$this->newUser->email}",
+                "Role: {$this->newUser->role}"
+            ];
+        }
+
         return (new MailMessage)
-            ->line('The introduction to the notification.')
-            ->action('Notification Action', url('/'))
+            ->subject($subject)
+            ->greeting($greeting)
+            ->line(implode("\n", $lines))
             ->line('Thank you for using our application!');
     }
 
@@ -48,7 +75,10 @@ class UserCreation extends Notification
     public function toArray(object $notifiable): array
     {
         return [
-            //
+            'user_id' => $this->newUser->id,
+            'user_name' => $this->newUser->name,
+            'user_email' => $this->newUser->email,
+            'user_role' => $this->newUser->role,
         ];
     }
 }

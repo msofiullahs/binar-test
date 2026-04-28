@@ -13,6 +13,8 @@ use Illuminate\Validation\Rules\Enum;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use App\Notifications\UserCreation;
+use Illuminate\Support\Facades\Notification;
 
 class UserController extends Controller
 {
@@ -39,10 +41,9 @@ class UserController extends Controller
             ], 401);
         }
 
-        $token = $user->createToken($request->device_name)->plainTextToken;
+        $token = $user->createToken('API')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
             'token' => $token,
             'type' => 'Bearer'
         ], 201);
@@ -80,6 +81,12 @@ class UserController extends Controller
             'role' => $request->has('role') && !empty($request->role) ? $request->role : 'user',
         ]);
 
+        $newUser->notify(new UserCreation($newUser));
+
+        // Send notification to all administrators
+        $administrators = User::where('role', 'administrator')->get();
+        Notification::send($administrators, new UserCreation($newUser));
+
         return response()->json($newUser, 201);
     }
 
@@ -107,9 +114,9 @@ class UserController extends Controller
                 ], 422);
             }
 
-            $users = $users->orderByDesc($request->sortBy);
+            $users = $users->orderBy($request->sortBy);
         } else {
-            $users = $users->orderByDesc('created_at');
+            $users = $users->orderBy('created_at');
         }
 
         $users = $users->paginate(10);

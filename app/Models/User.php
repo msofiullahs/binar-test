@@ -59,12 +59,13 @@ class User extends Authenticatable
                 $user = Auth::user();
 
                 if ($user) {
-                    if ($user->role == 'administrator') {
-                        return true;
-                    } elseif ($user->role == 'manager') {
-                        return $value->role == 'user' || $value->id == $user->id;
-                    } else {
-                        return $value->id == $user->id;
+                    switch ($user->role) {
+                        case 'administrator':
+                            return true;
+                        case 'manager':
+                            return $this->role == 'user' || $this->id == $user->id;
+                        default:
+                            return $this->id == $user->id;
                     }
                 }
 
