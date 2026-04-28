@@ -27,15 +27,14 @@ Laravel is accessible, powerful, and provides tools required for large, robust a
 
 - PHP >= 8.3
 - Composer
-- Node.js & NPM
 - SQLite (file-based, no server required)
 
 ### Steps
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd <project-directory>
+   git clone https://github.com/msofiullahs/binar-test.git
+   cd binar-test
    ```
 
 2. **Install PHP dependencies**
@@ -61,15 +60,9 @@ Laravel is accessible, powerful, and provides tools required for large, robust a
 
    > **Note:** For SQLite, you only need to specify the `DB_CONNECTION` and optionally `DB_DATABASE`. Other database credentials (host, port, username, password) are not required.
 
-5. **Run migrations**
+5. **Run migrations and seeding data**
    ```bash
-   php artisan migrate
-   ```
-
-6. **Install JavaScript dependencies and build assets**
-   ```bash
-   npm install
-   npm run build
+   php artisan migrate --seed
    ```
 
 ### Quick Setup
@@ -148,6 +141,37 @@ Obtain an authentication token by providing valid credentials.
         "password": ["The password field is required."]
     }
 }
+```
+
+#### Example Login Credentials (from UserSeeder)
+
+You can use the following credentials to obtain tokens for different roles:
+
+| Role          | Email                  | Password  |
+|---------------|------------------------|-----------|
+| Administrator | admin@example.com      | password  |
+| Manager       | manager1@example.com   | password  |
+| User          | user1@example.com      | password  |
+
+**Example: Login as Administrator**
+```bash
+curl -X POST http://localhost:8000/api/token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"password"}'
+```
+
+**Example: Login as Manager**
+```bash
+curl -X POST http://localhost:8000/api/token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"manager1@example.com","password":"password"}'
+```
+
+**Example: Login as User**
+```bash
+curl -X POST http://localhost:8000/api/token \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user1@example.com","password":"password"}'
 ```
 
 ---
