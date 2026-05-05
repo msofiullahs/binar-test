@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Requests\CreateUserRequest;
+use App\Http\Requests\GetUsersRequest;
+use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Http\Request;
 use App\Enums\UserRoles;
-use App\Enums\UserSort;
-use Illuminate\Validation\Rules\Enum;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -20,18 +19,10 @@ class UserController extends Controller
 {
     public function getToken(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required',
-            'password' => 'required',
+        $request->validate([
+            'email' => ['required', 'email'],
+            'password' => ['required'],
         ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
 
         $user = User::where('email', $request->email)->first();
 
@@ -49,28 +40,14 @@ class UserController extends Controller
         ], 201);
     }
 
-    public function createUser(Request $request): JsonResponse
+    public function createUser(CreateUserRequest $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'email' => ['required', 'email', 'unique:users'],
-            'password' => ['required', Password::min(8)],
-            'name' => 'required',
-            'role' => new Enum(UserRoles::class)
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
         $auth = Auth::user();
-        if ($auth->role === 'manager' && $request->has('role') && in_array($request->role, ['administrator','manager'])) {
+
+        if ($auth->role === 'manager' && $request->filled('role') && in_array($request->role, ['administrator', 'manager'], true)) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Unable to create user with selected role'
+                'message' => 'Unable to create user with selected role',
             ], 422);
         }
 
@@ -78,49 +55,34 @@ class UserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'name' => $request->name,
-            'role' => $request->has('role') && !empty($request->role) ? $request->role : 'user',
+            'role' => $request->filled('role') ? $request->role : UserRoles::User->value,
         ]);
 
         $newUser->notify(new UserCreation($newUser));
 
-        // Send notification to all administrators
-        $administrators = User::where('role', 'administrator')->get();
+        $administrators = User::where('role', UserRoles::Administrator->value)->get();
         Notification::send($administrators, new UserCreation($newUser));
 
-        return response()->json($newUser, 201);
+        return (new UserResource($newUser))->response()->setStatusCode(201);
     }
 
-    public function getUsers(Request $request): JsonResponse
+    public function getUsers(GetUsersRequest $request): JsonResponse
     {
-        $users = User::where('active', true);
+        $users = User::query()
+            ->where('active', true);
 
-        if ($request->has('search')) {
+        if ($request->filled('search')) {
             $keyword = $request->search;
 
-            $users = $users->where('name','like', "%{$keyword}%")
-                ->orWhere('name','like', "%{$keyword}%");
+            $users->where(function ($query) use ($keyword) {
+                $query->where('name', 'like', "%{$keyword}%")
+                    ->orWhere('email', 'like', "%{$keyword}%");
+            });
         }
 
-        if ($request->has('sortBy')) {
-            $validator = Validator::make($request->all(), [
-                'sortBy' => new Enum(UserSort::class),
-            ]);
+        $users->orderBy($request->input('sortBy', 'created_at'));
+        $users = $users->withCount('orders')->paginate(10);
 
-            if ($validator->fails()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors()
-                ], 422);
-            }
-
-            $users = $users->orderBy($request->sortBy);
-        } else {
-            $users = $users->orderBy('created_at');
-        }
-
-        $users = $users->paginate(10);
-
-        return response()->json($users, 200);
+        return UserResource::collection($users);
     }
 }
